@@ -4,7 +4,7 @@ Kafka 4.2.0 (1 broker, 3 partition) nhận dữ liệu cảm biến giả lập;
 
 ## Kịch bản
 
-Mỗi lượt gửi 60 giây, bỏ 5 giây đầu khi tính. T1–T4 lặp 3 lần, S1/S3 chạy 1 lần. Dữ liệu: 100 sensor, key = `sensor_id`.
+Số liệu đo lại toàn bộ ngày 02/10/2026 trên một máy. Mỗi lượt gửi 60 giây, bỏ 5 giây đầu khi tính. T1–T4 lặp 3 lần, S1/S3 chạy 1 lần. Dữ liệu: 100 sensor, key = `sensor_id`.
 
 | Kịch bản | Tải gửi | Consumer | Mục đích |
 |---|---|---:|---|
@@ -32,22 +32,22 @@ Trung bình 3 lần (S1/S3: 1 lần). Khoảng min–max: [results/summary.csv](
 
 | | Consumer | Producer (msg/s) | Consumer (msg/s) | Max lag | Drain (s) | Kafka CPU / RAM | Python CPU / RAM |
 |---|---:|---:|---:|---:|---:|---|---|
-| T1 | 1 | 1.000 | 1.002 | 1.035 | 1 | 92% / 1.179 MB | 29% / 92 MB |
-| T2 | 1 | 5.000 | 5.001 | 4.003 | 1 | 108% / 1.195 MB | 62% / 93 MB |
-| T3 | 3 | 5.000 | 4.997 | 3.983 | 1 | 120% / 1.212 MB | 63% / 155 MB |
-| T4 | 3 | 10.000 | 9.994 | 7.306 | 1 | 119% / 1.236 MB | 85% / 156 MB |
-| S1 | 1 | 2.667 | 1.467 | 85.163 | 42 | 74% / 1.314 MB | 33% / 142 MB |
-| S3 | 3 | 2.667 | 2.667 | 55.430 | 1 | 91% / 1.315 MB | 57% / 183 MB |
+| T1 | 1 | 1.000 | 999 | 1.122 | 1 | 94% / 1.232 MB | 32% / 92 MB |
+| T2 | 1 | 5.000 | 5.000 | 5.242 | 0–1 | 108% / 1.253 MB | 67% / 93 MB |
+| T3 | 3 | 5.000 | 5.002 | 5.318 | 0–1 | 113% / 1.259 MB | 71% / 156 MB |
+| T4 | 3 | 10.000 | 9.999 | 9.617 | 0–1 | 120% / 1.270 MB | 98% / 156 MB |
+| S1 | 1 | 2.667 | 1.469 | 83.850 | 44 | 74% / 1.340 MB | 32% / 143 MB |
+| S3 | 3 | 2.667 | 2.666 | 54.173 | 1 | 85% / 1.338 MB | 60% / 183 MB |
 
-Lỗi gửi: 0 ở mọi lượt. Drain = thời gian đọc hết backlog sau khi producer dừng. CPU: 100% = một nhân. Ở S1/S3, tốc độ là trung bình trong cửa sổ đo (đã bỏ 5 giây đầu tải thấp), nên cao hơn trung bình cả lượt 2.500 msg/s.
+Lỗi gửi: 0 ở mọi lượt. Drain = thời gian đọc hết backlog sau khi producer dừng (`0–1`: giá trị làm tròn khác nhau giữa 3 lần lặp, đều dưới hoặc bằng 1 giây). CPU: 100% = một nhân. Ở S1/S3, tốc độ là trung bình trong cửa sổ đo (đã bỏ 5 giây đầu tải thấp), nên cao hơn trung bình cả lượt 2.500 msg/s.
 
-**Kiểm tra mất/trùng:** Missing = 0, Duplicates = 0 ở cả 14 lượt.
+**Kiểm tra mất/trùng:** Missing = 0, Duplicates = 0 ở cả 14 lượt. Kiểm tra 1:1: ở cả 14 lượt, mỗi sensor (100/100) chỉ do đúng một consumer xử lý.
 
 **Chia tải (T3):** mỗi consumer giữ đúng một partition.
 
 | Consumer | Partition | Số message | Tỷ lệ |
 |---|---|---:|---:|
-| C1 | 0 | 117.392 | 39,1% |
+| C1 | 0 | 117.391 | 39,1% |
 | C2 | 1 | 98.638 | 32,9% |
 | C3 | 2 | 83.969 | 28,0% |
 
@@ -59,9 +59,9 @@ Lỗi gửi: 0 ở mọi lượt. Drain = thời gian đọc hết backlog sau k
 ## Kết luận
 
 - Producer đạt đúng 1.000, 5.000 và 10.000 msg/s, consumer theo kịp (≥ 99,9%), không lỗi gửi, không mất, không trùng.
-- Một consumer đã đủ cho 5.000 msg/s, nên T3 không nhanh hơn T2. Thêm consumer chỉ có ích khi consumer là điểm nghẽn: khi tải tăng đột biến và xử lý chậm, 1 consumer mất 42 giây đọc hết backlog, 3 consumer mất khoảng 1 giây.
+- Một consumer đã đủ cho 5.000 msg/s, nên T3 không nhanh hơn T2. Thêm consumer chỉ có ích khi consumer là điểm nghẽn: khi tải tăng đột biến và xử lý chậm, 1 consumer mất 44 giây đọc hết backlog, 3 consumer mất khoảng 1 giây.
 - Tải chia theo partition (39% / 33% / 28%), không đều tuyệt đối vì 100 sensor được băm vào 3 partition.
-- Max lag ở T1, T2, T4 tương ứng khoảng 1 giây tải, phù hợp với chu kỳ commit offset 1 giây, không phải backlog tích tụ.
+- Max lag ở T1, T2, T4 tương ứng khoảng 1,1; 1,05 và 0,96 giây tải, phù hợp với chu kỳ commit offset 1 giây, không phải backlog tích tụ.
 
 ## Giới hạn
 

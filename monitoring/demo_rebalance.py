@@ -40,7 +40,9 @@ def main():
         handles.append(handle)
         procs[name] = subprocess.Popen(
             [sys.executable, "-u", "-m", module, "--run-id", args.run_id, "--topic", topic, *extra],
-            cwd=ROOT, stdin=subprocess.DEVNULL, stdout=handle, stderr=subprocess.STDOUT)
+            cwd=ROOT, stdin=subprocess.DEVNULL, stdout=handle, stderr=subprocess.STDOUT,
+            # Windows cannot send SIGINT to a child; a separate process group lets us send CTRL_BREAK instead.
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0)
 
     def assignment(ids):
         table = {}
@@ -85,7 +87,7 @@ def main():
         if args.crash:
             procs["C2"].kill()
         else:
-            procs["C2"].send_signal(signal.SIGINT)
+            procs["C2"].send_signal(signal.CTRL_BREAK_EVENT if sys.platform == "win32" else signal.SIGINT)
         procs["C2"].wait(timeout=30)
         alive = ["C1", "C3"]
         wait_full(alive)

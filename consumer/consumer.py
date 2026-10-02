@@ -65,6 +65,8 @@ def main():
 
     signal.signal(signal.SIGINT, handler)
     signal.signal(signal.SIGTERM, handler)
+    if hasattr(signal, "SIGBREAK"):  # Windows: CTRL_BREAK_EVENT is how demo_rebalance asks a consumer to stop
+        signal.signal(signal.SIGBREAK, handler)
 
     sensor_parts = defaultdict(Counter)
     invalid_f = (out / f"invalid_{tag}.jsonl").open("a", encoding="utf-8")
