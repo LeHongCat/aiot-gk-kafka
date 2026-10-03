@@ -41,15 +41,15 @@ Trung bình 3 lần (S1/S3: 1 lần). Khoảng min–max: [results/summary.csv](
 
 Lỗi gửi: 0 ở mọi lượt. Drain = thời gian đọc hết backlog sau khi producer dừng (`0–1`: giá trị làm tròn khác nhau giữa 3 lần lặp, đều dưới hoặc bằng 1 giây). CPU: 100% = một nhân. Ở S1/S3, tốc độ là trung bình trong cửa sổ đo (đã bỏ 5 giây đầu tải thấp), nên cao hơn trung bình cả lượt 2.500 msg/s.
 
-* **Consumer (Số lượng Consumer)**: Số lượng tiến trình Consumer chạy đồng thời trong cùng một **Consumer Group** để đọc dữ liệu.
-* **Producer (msg/s)**: Tốc độ đẩy dữ liệu vào Kafka của ứng dụng gửi (số thông điệp/giây).
-* **Consumer (msg/s)**: Tốc độ đọc và xử lý dữ liệu thực tế từ Kafka của toàn bộ nhóm Consumer (số thông điệp/giây).
-* **Max lag (Lượng dữ liệu tồn đọng đỉnh điểm)**: Số lượng thông điệp nhiều nhất bị kẹt lại trong Kafka chưa kịp đọc tại thời điểm tải cao nhất.
-* **Drain (s) (Thời gian xả đệm - giây)**: Thời gian mà nhóm Consumer cần để đọc hết toàn bộ số tin nhắn còn đọng lại trong Kafka **sau khi Producer đã ngừng gửi hẳn**.
-* **Kafka CPU / RAM**: Mức tiêu thụ tài nguyên phần cứng của máy chủ Kafka Broker.
-* *CPU*: 100% tương đương với việc sử dụng tối đa **1 nhân CPU**. (Ví dụ: 120% = dùng 1,2 nhân CPU).
-* *RAM*: Dung lượng bộ nhớ đệm Kafka sử dụng (tính bằng MB).
-* **Python CPU / RAM**: Mức tiêu thụ tài nguyên của ứng dụng Python (chứa code Producer/Consumer client).
+| Thông số | Nghĩa |
+|---|---|
+| Consumer (Số lượng Consumer) | Số lượng tiến trình Consumer chạy đồng thời trong cùng một **Consumer Group** để đọc dữ liệu. |
+| Producer (msg/s) | Tốc độ đẩy dữ liệu vào Kafka của ứng dụng gửi (số thông điệp/giây). |
+| Consumer (msg/s) | Tốc độ đọc và xử lý dữ liệu thực tế từ Kafka của toàn bộ nhóm Consumer (số thông điệp/giây). |
+| Max lag (Lượng dữ liệu tồn đọng đỉnh điểm) | Số lượng thông điệp nhiều nhất bị kẹt lại trong Kafka chưa kịp đọc tại thời điểm tải cao nhất. |
+| Drain (s) (Thời gian xả đệm - giây) | Thời gian mà nhóm Consumer cần để đọc hết toàn bộ số tin nhắn còn đọng lại trong Kafka **sau khi Producer đã ngừng gửi hẳn**. |
+| Kafka CPU / RAM | Mức tiêu thụ tài nguyên phần cứng của máy chủ Kafka Broker. *CPU*: 100% tương đương với việc sử dụng tối đa **1 nhân CPU** (ví dụ: 120% = dùng 1,2 nhân CPU). *RAM*: Dung lượng bộ nhớ đệm Kafka sử dụng (tính bằng MB). |
+| Python CPU / RAM | Mức tiêu thụ tài nguyên của ứng dụng Python (chứa code Producer/Consumer client). |
 
 **Kiểm tra mất/trùng:** Missing = 0, Duplicates = 0 ở cả 14 lượt. Kiểm tra 1:1: ở cả 14 lượt, mỗi sensor (100/100) chỉ do đúng một consumer xử lý.
 

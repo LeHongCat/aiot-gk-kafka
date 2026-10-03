@@ -11,13 +11,10 @@ Dựng Kafka cục bộ bằng Docker, đẩy dữ liệu cảm biến giả l�
 5. [Demo: sensor → partition → consumer](#5-demo-sensor--partition--consumer)
 6. [Benchmark và kết quả chính](#6-benchmark)
 7. [Kết quả nằm ở đâu](#7-kết-quả-nằm-ở-đâu)
-8. [Cấu hình](#8-cấu-hình)
-9. [Dọn dẹp](#9-dọn-dẹp)
-10. [Xử lý sự cố](#10-xử-lý-sự-cố)
-11. [Giới hạn](#11-giới-hạn)
-12. [Tuyên bố sử dụng AI](#12-tuyên-bố-sử-dụng-ai-ai-disclosure)
+8. [Dọn dẹp](#9-dọn-dẹp)
+9. [Giới hạn](#11-giới-hạn)
+10. [Tuyên bố sử dụng AI](#12-tuyên-bố-sử-dụng-ai-ai-disclosure)
 
----
 
 ## 1. Tổng quan và cách hoạt động
 
@@ -35,20 +32,6 @@ flowchart LR
 ```
 
 **Luồng dữ liệu.** Producer sinh JSON `{sensor_id, temperature, humidity, voltage, current, timestamp}` cho 100 sensor `motor_001..motor_100` và gửi vào topic với `key = sensor_id`. Ba consumer thuộc cùng một group đọc và kiểm tra schema từng bản ghi.
-
-**Vì sao một sensor chỉ về một consumer.**
-
-1. *Sensor → partition:* partitioner của producer tính `CRC32(sensor_id) % số_partition`. Cùng key thì luôn ra cùng partition, miễn là số partition không đổi. Ví dụ `crc32('motor_001') = 434435839`, chia 3 dư 1, nên `motor_001` luôn vào **Partition 1**.
-2. *Partition → consumer:* trong một group, mỗi partition được gán cho đúng một consumer, nên partition 1 do một consumer duy nhất đọc (trong lần đo là C2). Nhiều sensor có thể dùng chung một consumer, nhưng một sensor không bao giờ bị tách ra nhiều consumer.
-3. *Thứ tự:* Kafka đảm bảo thứ tự trong từng partition, nên các bản ghi của một sensor luôn được đọc theo đúng thứ tự gửi.
-
-**"Chia đều" nghĩa là gì.** Mỗi consumer nhận một partition. Số message không bằng nhau tuyệt đối vì 100 sensor băm không đều vào 3 partition (đo thật ở T3-r1: 39,1% / 32,9% / 28,0%).
-
-**Điều kiện của tính nhất quán.** Sensor → partition cố định khi số partition không đổi. Partition → consumer cố định khi group ổn định; nếu một consumer rời đi hoặc tham gia thì Kafka *rebalance*: partition chuyển sang consumer khác (vẫn chỉ một consumer tại mỗi thời điểm). Xem demo rebalance ở mục 5.4.
-
-**Độ tin cậy.** Producer bật `enable.idempotence` và `acks=all`. Consumer tự commit offset mỗi giây, nên sau crash có thể đọc lại một phần (at-least-once, không phải exactly-once).
-
----
 
 ## 2. Cấu trúc thư mục
 
@@ -80,8 +63,6 @@ aiot-kafka-starter/
 ├── results/                  ảnh và CSV kết quả đã chọn đưa vào báo cáo
 └── output/                   kết quả từng lượt chạy (không đưa vào Git)
 ```
-
----
 
 ## 3. Yêu cầu và cài đặt
 
@@ -115,8 +96,6 @@ docker compose ps
 
 Muốn xem giao diện web: `docker compose --profile ui up -d`, rồi mở http://localhost:8080. Mặc định tắt để không chiếm CPU khi đo.
 
----
-
 ## 4. Kiểm tra nhanh
 
 ```bash
@@ -125,13 +104,11 @@ python -m monitoring.run_scenario --run-id smoke01 --rate 100 --consumers 1 --du
 
 Kết quả đúng: chạy đủ 6 bước `[1/6]..[6/6]`, `Send errors / invalid : 0 / 0`, dòng `PASS: no message lost, none read twice.` và `1:1 check: 100/100 sensors ...`. Nếu pass thì Docker, Kafka và các script đều ổn.
 
----
-
 ## 5. Demo: sensor → partition → consumer
 
 Mỗi demo tự tạo topic riêng và tự xóa khi xong. Thứ tự dưới đây phù hợp khi trình bày.
 
-### 5.1. Nhất quán qua nhiều vòng (bắt đầu từ đây)
+### 5.1. Kiểm tra tính nhất quán
 
 ```bash
 python -m monitoring.demo_consistency                 # 30 sensor, 5 vòng, theo dõi motor_001
@@ -200,8 +177,6 @@ python -m producer.producer --topic live-demo --run-id live-p1 --rate 2 --durati
 
 Đợi cả ba consumer in `ASSIGN` trước khi gửi. Mỗi lần gửi cần `--run-id` mới. Bấm Ctrl+C ở một consumer để xem rebalance.
 
----
-
 ## 6. Benchmark
 
 ### 6.1. Các kịch bản
@@ -257,14 +232,15 @@ python -m monitoring.summary
 
 | Thông số | Nghĩa |
 |---|---|
-| Producer (msg/s) | Số bản ghi broker **xác nhận (ACK)** mỗi giây, trong cửa sổ đo (sau warmup) |
-| Consumer (msg/s) | Tổng lượt xử lý hợp lệ của mọi consumer mỗi giây |
-| Max lag | Cực đại của tổng (log-end offset − offset đã commit), lấy mẫu mỗi giây |
-| Drain (s) | Sau khi producer dừng, mất bao lâu để lag về 0 |
+| Consumer (Số lượng Consumer) | Số lượng tiến trình Consumer chạy đồng thời trong cùng một **Consumer Group** để đọc dữ liệu. |
+| Producer (msg/s) | Tốc độ đẩy dữ liệu vào Kafka của ứng dụng gửi (số thông điệp/giây). |
+| Consumer (msg/s) | Tốc độ đọc và xử lý dữ liệu thực tế từ Kafka của toàn bộ nhóm Consumer (số thông điệp/giây). |
+| Max lag (Lượng dữ liệu tồn đọng đỉnh điểm) | Số lượng thông điệp nhiều nhất bị kẹt lại trong Kafka chưa kịp đọc tại thời điểm tải cao nhất. |
+| Drain (s) (Thời gian xả đệm - giây) | Thời gian mà nhóm Consumer cần để đọc hết toàn bộ số tin nhắn còn đọng lại trong Kafka **sau khi Producer đã ngừng gửi hẳn**. |
 | Lỗi gửi | Số lỗi giao hàng của producer, phải bằng 0 |
-| Kafka CPU/RAM | Từ `docker stats`; 100% = 1 nhân; RAM có cả cache |
-| Python CPU/RAM | Tổng producer + consumer + monitor |
-| Missing / Duplicates | Phải bằng 0 khi không có crash |
+| Kafka CPU / RAM | Mức tiêu thụ tài nguyên phần cứng của máy chủ Kafka Broker. *CPU*: 100% tương đương với việc sử dụng tối đa **1 nhân CPU** (ví dụ: 120% = dùng 1,2 nhân CPU). *RAM*: Dung lượng bộ nhớ đệm Kafka sử dụng (tính bằng MB). |
+| Python CPU / RAM | Mức tiêu thụ tài nguyên của ứng dụng Python (chứa code Producer/Consumer client). |
+| Missing / Duplicates | Số bản ghi mất / đọc trùng; phải bằng 0 khi không có crash |
 
 Lag đo theo offset **đã commit** và consumer commit mỗi 1 giây, nên Max lag ở T1/T2/T4 (cỡ 1 giây tải) chủ yếu phản ánh chu kỳ commit chứ không phải backlog tích tụ.
 
@@ -307,9 +283,7 @@ Biểu đồ (trong [results/](results/)): `T4-r1_throughput.png`, `T3-r1_distri
 ![Lag S1 (1 consumer)](results/S1-r1_consumer_lag.png)
 ![Lag S3 (3 consumer)](results/S3-r1_consumer_lag.png)
 
----
-
-## 7. Kết quả nằm ở đâu
+## 7. Kết quả
 
 Mỗi lượt lưu trong `output/<run-id>/`; `summary` ghi thêm `output/summary.csv`.
 
@@ -325,24 +299,6 @@ Mỗi lượt lưu trong `output/<run-id>/`; `summary` ghi thêm `output/summary
 
 Thư mục `output/` không được đưa vào Git. Các ảnh và CSV đã chọn cho báo cáo nằm trong [results/](results/).
 
----
-
-## 8. Cấu hình
-
-Sao chép `.env.example` thành `.env` để thay đổi. Biến môi trường của hệ điều hành được ưu tiên hơn `.env`.
-
-| Biến | Mặc định | Ghi chú |
-|---|---|---|
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | |
-| `KAFKA_TOPIC` | `sensor-data` | Dùng cho chế độ nhiều terminal |
-| `KAFKA_PARTITIONS` | `3` | Phải khớp số partition của topic |
-| `KAFKA_CONSUMER_GROUP` | `aiot-group` | |
-| `PRODUCER_RATE`, `PRODUCER_DURATION` | `5000`, `60` | |
-| `NUM_SENSORS` | `100` | `motor_001..motor_100` |
-
-Producer dùng: `acks=all`, idempotence, `linger.ms=5`, nén `lz4`. Consumer: `auto.offset.reset=earliest`, commit mỗi 1 giây.
-
----
 
 ## 9. Dọn dẹp
 
@@ -355,23 +311,7 @@ docker compose down                     # chỉ tắt Kafka, giữ dữ liệu
 
 `clean` xóa cả `output/`, tức mất hết kết quả đo; hãy sao lưu trước nếu cần. Thêm `--yes` để bỏ qua câu hỏi xác nhận.
 
----
-
-## 10. Xử lý sự cố
-
-| Triệu chứng | Cách xử lý |
-|---|---|
-| `failed to connect to the docker API` | Docker chưa chạy. Mở Docker Desktop, đợi sẵn sàng. |
-| `Timeout: ... assigning partitions` | Kafka chưa healthy: `docker compose ps`, đợi rồi chạy lại. |
-| `already has data. Use a new --run-id` | Đổi `--run-id`, hoặc xóa `output/<run-id>`. |
-| `Topic ... already exists` | Lượt trước bị ngắt giữa chừng: chạy `python -m monitoring.clean --kafka` hoặc đổi `--run-id`. |
-| `No module named ...` | Chưa ở thư mục gốc dự án hoặc chưa kích hoạt venv. |
-| `Connect to ipv6#[::1]:9092` | Đã xử lý bằng `broker.address.family=v4`; nếu vẫn gặp, kiểm tra cổng 9092 có bị chương trình khác chiếm không. |
-| Kết quả dao động mạnh | Đóng ứng dụng nặng, không chạy hai lượt cùng lúc, chạy lặp r1–r3. |
-
----
-
-## 11. Giới hạn
+## 9. Giới hạn
 
 - Một broker, replication factor 1: chứng minh được chịu lỗi ở mức **consumer** (rebalance), **chưa** ở mức broker.
 - Consumer đọc lại sau crash có thể xử lý trùng (at-least-once), không phải exactly-once.
@@ -381,10 +321,14 @@ docker compose down                     # chỉ tắt Kafka, giữ dữ liệu
 - S1 và S3 chỉ có một lần đo; T4 chưa đo với một consumer.
 - Kết quả phụ thuộc máy chạy, không so sánh trực tiếp giữa các máy khác nhau.
 
----
+## 10. Tuyên bố sử dụng AI (AI Disclosure)
 
-## 12. Tuyên bố sử dụng AI (AI Disclosure)
-
-- **Công cụ AI đã dùng:**
-- **Mục đích cụ thể:**
+- **Công cụ AI đã dùng:** Claude Code, ChatGPT
+- **Mục đích cụ thể:** 
+    - ClaudeCode: hỗ trợ xây dựng các kịch bản benchmark và mở rộng chúng; hỗ trợ viết code (producer, consumer, các script monitoring); tư vấn cài đặt phần mềm, thư viện và phiên bản phù hợp với project.
+    - ChatGPT: hỗ trợ tìm hiểu kiến thức nền về Kafka, gợi ý nguồn tài liệu tham khảo, sơ đồ và khung lý thuyết.
 - **Mức độ đóng góp của sinh viên:**
+    - Xác định yêu cầu và quyết định thiết kế: Kafka 1 broker (KRaft) chạy bằng Docker, topic 3 partition, `key = sensor_id` để mỗi sensor luôn về cùng một consumer.
+    - Trực tiếp chạy toàn bộ 14 lượt benchmark trên máy của nhóm, rồi phân tích kết quả và rút ra kết luận.
+    - Đọc, chạy thử, sửa lỗi và điều chỉnh mã do AI đề xuất; kiểm chứng bằng `monitoring.verify` (không mất, không trùng, 1:1 sensor → consumer).
+    - Viết REPORT.md và README.md; chuẩn bị và trình bày demo.
